@@ -45,6 +45,26 @@ async def magic_song(
     )
     song_id, callback_url = generator.iniciar_generacion(req_data, background_tasks)
 
+    # Esperar a que el archivo esté disponible (máx 60s)
+    import time
+    filename = title.replace(" ", "_").replace("/", "-") + ".mp3"
+    path = os.path.join(UPLOAD_FOLDER, filename)
+    timeout = 120
+    waited = 0
+    while waited < timeout:
+        if os.path.exists(path):
+            break
+        time.sleep(2)
+        waited += 2
+    if not os.path.exists(path):
+        return JSONResponse({
+            "success": False,
+            "song_id": song_id,
+            "message": "La canción aún no está disponible. Intenta descargarla más tarde.",
+            "download_url": f"{CALLBACK_BASE_URL}/magic/download/{title}",
+            "lyrics": texto_en,
+        }, status_code=202)
+
     # 5. Devolver respuesta con song_id y rutas de consulta
     download_url = f"{CALLBACK_BASE_URL}/magic/download/{title}"
     return JSONResponse({

@@ -22,4 +22,4 @@ PORT = int(os.getenv("PORT", 8000))  # Default: 8000
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "canciones")
 
 # URL base para callbacks (lo maneja ngrok en runtime)
-CALLBACK_BASE_URL = os.getenv("CALLBACK_BASE_URL", "http://localhost")
+CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", os.getenv("CALLBACK_BASE_URL", "http://localhost"))

@@ -3,8 +3,8 @@ from fastapi.responses import JSONResponse, FileResponse
 from app.services import transcriber, translator, generator
 from app.models.schemas import SongRequest
 import os
-from app.core.config import UPLOAD_FOLDER, CALLBACK_BASE_URL
 from app.utils.logger import log_event
+from app.core.config import UPLOAD_FOLDER
 
 router = APIRouter()
 
@@ -43,38 +43,40 @@ async def magic_song(
         style=style,
         title=title
     )
-    song_id, callback_url = generator.iniciar_generacion(req_data, background_tasks)
+    print(f"Request data: {req_data}")
 
-    # Esperar a que el archivo esté disponible (máx 60s)
-    import time
     filename = title.replace(" ", "_").replace("/", "-") + ".mp3"
     path = os.path.join(UPLOAD_FOLDER, filename)
-    timeout = 120
-    waited = 0
-    while waited < timeout:
-        if os.path.exists(path):
-            break
-        time.sleep(2)
-        waited += 2
-    if not os.path.exists(path):
-        return JSONResponse({
-            "success": False,
-            "song_id": song_id,
-            "message": "La canción aún no está disponible. Intenta descargarla más tarde.",
-            "download_url": f"{CALLBACK_BASE_URL}/magic/download/{title}",
-            "lyrics": texto_en,
-        }, status_code=202)
+    # Validar si ya existe la canción antes de generar
+    if os.path.exists(path):
+        log_event(f"Canción ya existe: {path}, no se vuelve a generar.")
+        download_url = f"{os.environ.get('CALLBACK_BASE_URL', 'http://localhost')}/magic/download/{title}"
+        log_event(f"Archivo descargable en : {download_url}")
 
-    # 5. Devolver respuesta con song_id y rutas de consulta
-    download_url = f"{CALLBACK_BASE_URL}/magic/download/{title}"
+        return JSONResponse({
+            "success": True,
+            "song_id": None,
+            "download_url": download_url,
+            "lyrics": texto_en,
+            "message": "La canción ya existe y no se volvió a generar."
+        })
+
+    song_id, callback_url = generator.iniciar_generacion(req_data, background_tasks)
+
+    # Log para depuración
+    log_event(f"Generación en background lanzada para archivo: {filename} con song_id: {song_id}")
+
+    # Responder de inmediato, sin esperar el archivo
+    download_url = f"{os.environ.get('CALLBACK_BASE_URL', 'http://localhost')}/magic/download/{title}"
     return JSONResponse({
         "success": True,
         "song_id": song_id,
         "download_url": download_url,
         "lyrics": texto_en,
+        "message": "La generación de la canción ha sido iniciada. Consulta el estado o descarga más tarde."
     })
 
-@router.get("/magic/download/{title}", summary="Descargar canción generada por título", tags=["Magic"])
+@router.get("/download/{title}", summary="Descargar canción generada por título", tags=["Magic"])
 def magic_download_by_title(title: str):
     """
     Devuelve el archivo MP3 generado si ya existe en disco, buscando por el título.

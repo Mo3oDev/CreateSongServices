@@ -67,6 +67,8 @@ async def suno_callback(request: Request):
         # Descargar audio si hay url válida
         if audio_url:
             safe_title = title.replace(" ", "_").replace("/", "-")
+            # Crear carpeta si no existe
+            os.makedirs(UPLOAD_FOLDER, exist_ok=True)
             filename = os.path.join(UPLOAD_FOLDER, f"{safe_title}.mp3")
             if not os.path.exists(filename):
                 audio_response = requests.get(audio_url)
